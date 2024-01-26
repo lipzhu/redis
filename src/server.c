@@ -1482,8 +1482,8 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         migrateCloseTimedoutSockets();
     }
 
-    /* Stop the I/O threads if we don't have enough pending work. */
-    stopThreadedIOIfNeeded();
+    /* Adjust the I/O threads accoring to the realtime workloads. */
+    adjustThreadedIOIfNeeded();
 
     /* Resize tracking keys table if needed. This is also done at every
      * command execution, but we want to be sure that if the last command
@@ -2584,6 +2584,7 @@ void initServer(void) {
     server.slaves = listCreate();
     server.monitors = listCreate();
     server.clients_pending_write = listCreate();
+    server.clients_pending_write_avg_num = 0;
     server.clients_pending_read = listCreate();
     server.clients_timeout_table = raxNew();
     server.replication_allowed = 1;
@@ -5511,7 +5512,7 @@ sds genRedisInfoString(dict *section_dict, int all_sections, int everything) {
             "lru_clock:%u\r\n"
             "executable:%s\r\n"
             "config_file:%s\r\n"
-            "io_threads_active:%i\r\n",
+            "io_threads_active_num:%i\r\n",
             REDIS_VERSION,
             redisGitSHA1(),
             strtol(redisGitDirty(),NULL,10) > 0,
@@ -5539,7 +5540,7 @@ sds genRedisInfoString(dict *section_dict, int all_sections, int everything) {
             server.lruclock,
             server.executable ? server.executable : "",
             server.configfile ? server.configfile : "",
-            server.io_threads_active);
+            server.io_threads_active_num);
 
         /* Conditional properties */
         if (isShutdownInitiated()) {
